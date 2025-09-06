@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   description:
     "Lexica helps students, professionals, and creators transform raw ideas into polished reports and documents instantly with AI.",
    icons: {
-    icon: "/icon.svg", // <- path to your icon
+    icon: "/icon.svg", 
    
   },
 };
