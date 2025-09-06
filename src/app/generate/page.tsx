@@ -213,8 +213,8 @@ export default function GeneratePage() {
         throw new Error(data.error || "Failed to enhance prompt");
 
       setIdea(data.enhancedPrompt);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError((err as Error).message);
     } finally {
       setIsEnhancing(false);
     }
@@ -235,8 +235,8 @@ export default function GeneratePage() {
       if (!response.ok)
         throw new Error(data.error || "Failed to generate report");
       setReport(data.pitch || "");
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError((err as Error).message);
     } finally {
       setIsGenerating(false);
     }
@@ -302,8 +302,8 @@ const downloadDocx = async () => {
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
-  } catch (err: any) {
-    alert(err.message || "Download failed");
+  } catch (err: unknown) {
+    alert((err as Error).message || "Download failed");
   }
 };
 
