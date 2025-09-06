@@ -176,7 +176,7 @@ export default function GeneratePage() {
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [error, setError] = useState("");
 
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const router = useRouter();
 
   useEffect(() => {
