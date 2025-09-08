@@ -127,11 +127,18 @@ Your final output is ONLY the generated report itself. You will begin your respo
     }
 
     return NextResponse.json({ pitch });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("--- Full Generation Error ---:", error);
+    if (error instanceof Error) {
     return NextResponse.json(
-      { error: error.message || "An internal server error occurred." },
+      { error: error.message },
       { status: 500 }
     );
   }
+
+  return NextResponse.json(
+    { error: "An internal server error occurred." },
+    { status: 500 }
+  );
+}
 }
