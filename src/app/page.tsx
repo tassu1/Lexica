@@ -290,7 +290,7 @@ export default function Home() {
             </Link>
           </div>
           <p className="text-slate-600 mt-6 text-sm">
-            Free to start. No credit card required.
+            Free to start. No credit card required
           </p>
         </div>
       </section>
