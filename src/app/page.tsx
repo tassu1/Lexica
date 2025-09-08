@@ -278,7 +278,7 @@ export default function Home() {
             Ready to Automate Your Writing?
           </h2>
           <p className="text-xl text-slate-700 mb-8">
-            Join thousands of users saving hours of work with Lexica's AI Report
+            Join thousands of users saving hours of work with Lexica&apos;s AI Report
             Generator.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
