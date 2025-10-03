@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // --- OpenRouter API Call with the final, intelligent prompt ---
+    // OpenRouter API Call with the final, intelligent prompt 
     const response = await fetch(
       "https://openrouter.ai/api/v1/chat/completions",
       {
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
           "X-Title": "AI Report Generator",
         },
         body: JSON.stringify({
-          model: "openrouter/sonoma-dusk-alpha", // A powerful and reliable model for detailed reports
+          model: "openrouter/sonoma-dusk-alpha", 
           messages: [
             {
               role: "system",
