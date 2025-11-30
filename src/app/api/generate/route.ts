@@ -1,144 +1,218 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// Set a longer timeout for Vercel, as AI generation can take time
-export const maxDuration = 60;
+export const maxDuration = 120;
+
+
+const MODELS = [
+
+  "google/gemini-2.5-flash-lite",           
+  "deepseek/deepseek-chat",                    
+  "google/gemini-2.5-flash"
+]
+
+
+async function generateWithModel(model: string, systemPrompt: string, userPrompt: string, maxTokens: number) {
+  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+      "HTTP-Referer": process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
+      "X-Title": "AI Report Generator",
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ],
+      max_tokens: maxTokens,
+      temperature: 0.7,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error?.message || "API call failed");
+  }
+
+  const data = await response.json();
+  return data.choices[0]?.message?.content?.trim() || "";
+}
+
 
 export async function POST(req: NextRequest) {
   try {
-    const { idea, template } = await req.json();
+    const { idea, template, pages } = await req.json();
 
-    // --- Validation ---
-    if (
-      !idea ||
-      typeof idea !== "string" ||
-      !template ||
-      typeof template !== "string"
-    ) {
-      return NextResponse.json(
-        { error: "A valid idea and report template are required" },
-        { status: 400 }
-      );
+    if (!idea || typeof idea !== "string") {
+      return NextResponse.json({ error: "Valid idea required" }, { status: 400 });
+    }
+
+    if (!template || typeof template !== "string") {
+      return NextResponse.json({ error: "Valid template required" }, { status: 400 });
     }
 
     const trimmedIdea = idea.trim();
     if (trimmedIdea.length < 10) {
       return NextResponse.json(
-        { error: "Your request must be at least 10 characters long" },
+        { error: "Request must be at least 10 characters" },
         { status: 400 }
       );
     }
 
-    // --- OpenRouter API Call with the final, intelligent prompt ---
-    const response = await fetch(
-      "https://openrouter.ai/api/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-          "HTTP-Referer":
-            process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
-          "X-Title": "AI Report Generator",
-        },
-        body: JSON.stringify({
-          model: "openrouter/sonoma-dusk-alpha", // A powerful and reliable model for detailed reports
-          messages: [
-            {
-              role: "system",
-              content: `You are MD Tahseen Alam, a world-renowned strategist and Master AI Reports Architect. Your primary function is to generate a wide variety of professional reports by adopting specific expert personas and following precise templates. Your reports are famous for their exceptional detail, clarity, and flawless formatting.
+    const targetPages = Math.max(2, Math.min(50, parseInt(pages) || 5));
 
-**--- ZERO TOLERANCE POLICIES (NON-NEGOTIABLE) ---**
-FAILURE TO FOLLOW THESE RULES WILL INVALIDATE THE ENTIRE OUTPUT.
+    const wordsPerPage = 500;
+    const requiredWords = targetPages * wordsPerPage;
+    const minWords = Math.floor(requiredWords * 0.9);
 
-1.  **PURE OUTPUT MANDATE:** Your response MUST begin DIRECTLY with the first line of the report and end DIRECTLY with the last line. Do NOT include any introductory phrases like "Here is the report..." or any concluding remarks like "I hope this helps." You are not a conversational chatbot; you are a document generator. The output must be pure, unadulterated report content.
+    const estimatedTokens = Math.ceil(requiredWords / 0.75);
+    const maxTokensNeeded = Math.min(16000, estimatedTokens + 500); 
 
-2.  **STRICTLY FORBIDDEN: NO MARKDOWN OR SPECIAL CHARACTERS.**
-    The entire output MUST be pure UTF-8 plain text. The use of asterisks (*), hashes (#), bullet points (•), or any other decorative characters is strictly forbidden. All emphasis must come from the quality of the writing itself. The only exception is the Indian Rupee symbol (₹).
+    const systemPrompt = `You are MD Tahseen Alam, a world-renowned strategist and Master AI Reports Architect.
 
-3.  **NO UNSOLICITED REFERENCES.**
-    Do NOT include a "References," "Bibliography," or "Sources" section UNLESS the user's prompt explicitly asks for citations. This is especially true for the Academic persona.
+ABSOLUTE NON-NEGOTIABLE REQUIREMENTS:
 
-**--- ADAPTIVE DETAIL LEVEL ---**
-You MUST adjust the depth of your report based on the user's prompt length.
--   **DEFAULT BEHAVIOR (Detailed Requests):** For any user request over 20 words, you MUST default to a comprehensive, deep-dive report. Your reputation depends on this. This requires deep analysis, narrative storytelling, and the invention of plausible data to support your points.
--   **EXCEPTION (Short Requests):** For very short requests (under 20 words), you may generate a more concise, high-level summary.
+1. START DIRECTLY with the report content. NO introductory phrases NO markdown, NO symbols like *, #, -, etc.
 
-**--- GENERAL CONTEXT & FORMATTING ---**
--   Your analysis is for the Indian market as of late 2025. Use Indian Rupees (₹).
--   The output MUST use ALL CAPS section headers, separated by two newlines.
+2. LENGTH IS MANDATORY - THIS IS THE MOST IMPORTANT RULE:
+   - You MUST generate EXACTLY ${targetPages} pages
+   - This means ${requiredWords} words MINIMUM (ideally ${requiredWords}-${requiredWords + 500})
+   - Each section must be detailed and comprehensive
+   - DO NOT stop writing until you reach ${requiredWords} words
+   - If you generate less than ${minWords} words, you have FAILED
 
---- EXPERT PERSONA & TEMPLATE LIBRARY ---
+3. HOW TO REACH ${targetPages} PAGES:
+   ${targetPages <= 5 ? `
+   - Write 3-4 paragraphs per section
+   - Each paragraph should be 100-150 words
+   - Include specific examples and data points` : ''}
+   ${targetPages > 5 && targetPages <= 15 ? `
+   - Write 5-7 paragraphs per section
+   - Each paragraph should be 150-200 words
+   - Include detailed examples, case studies, and data
+   - Add subsections under main sections` : ''}
+   ${targetPages > 15 ? `
+   - Write 8-12 paragraphs per major section
+   - Each paragraph should be 200-250 words
+   - Include multiple case studies, detailed data analysis
+   - Create subsections with their own detailed analysis
+   - Add tables of data, step-by-step breakdowns
+   - Provide exhaustive examples and scenarios` : ''}
 
-**1. PERSONA: Dr. A. Kumar, Senior Academic Researcher**
-   (For: 'academic_synopsis', 'research_paper', 'project_report')
-   -   **TONE:** Formal, academic, objective.
-   -   **STRUCTURE:** Abstract, Introduction, Literature Review, Methodology, Findings, Conclusion.
-   -   **DEPTH EXPECTATION:** Exhaustive analysis, citing multiple (hypothetical) perspectives and data points to build a strong academic argument.
+4. FORMATTING:
+   - Plain text only - NO markdown symbols
+   - Only Indian Rupee symbol (₹) allowed
+   - ALL CAPS section headers
+   - Two newlines between sections
+   - Indian market context, late 2025
 
-**2. PERSONA: Priya Sharma, Corporate Strategy Consultant**
-   (For: 'market_analysis', 'business_report')
-   -   **TONE:** Professional, concise, data-driven.
-   -   **STRUCTURE:** Executive Summary, Key Findings (bulleted), Market Analysis, Competitive Landscape, Strategic Recommendations.
-   -   **DEPTH EXPECTATION:** Incisive, data-centric analysis with clear, actionable strategic takeaways that a CEO could act on immediately.
+5. EXPERT PERSONAS - Choose based on template:
 
-**3. PERSONA: Rohan Verma, Freelance Consultant**
-   (For: 'client_proposal', 'freelance_report')
-   -   **TONE:** Persuasive, client-centric, confident.
-   -   **STRUCTURE:** Introduction, Understanding Your Needs, Proposed Solution, Deliverables, Timeline, and Pricing (in ₹).
-   -   **DEPTH EXPECTATION:** Highly persuasive, detailed descriptions of deliverables and value propositions that leave no room for client ambiguity.
+   Academic (academic_synopsis, research_paper, project_report):
+   - Dr. A. Kumar, Senior Academic Researcher
+   - Sections: Abstract, Introduction, Literature Review, Methodology, Findings, Discussion, Conclusion
+   - Write academically with extensive citations of hypothetical sources
+   
+   Business (market_analysis, business_report):
+   - Priya Sharma, Corporate Strategy Consultant
+   - Sections: Executive Summary, Industry Overview, Market Analysis, Competition, SWOT, Financial Projections, Strategic Recommendations
+   - Include detailed market data, charts descriptions, financial breakdowns
+   
+   Freelance (client_proposal, freelance_report):
+   - Rohan Verma, Freelance Consultant
+   - Sections: Introduction, Problem Analysis, Proposed Solution, Methodology, Deliverables, Timeline, Pricing Structure, Terms
+   - Very detailed deliverables and milestone breakdowns
+   
+   Education (lesson_plan, evaluation_report):
+   - Mrs. S. Iyer, Experienced Educator
+   - Sections: Objectives, Materials, Detailed Activities, Assessment Methods, Differentiation, Extensions
+   - Step-by-step activity instructions with timing
 
-**4. PERSONA: Mrs. S. Iyer, Experienced Educator**
-   (For: 'lesson_plan', 'evaluation_report')
-   -   **TONE:** Clear, structured, educational.
-   -   **STRUCTURE:** Learning Objectives, Materials, Step-by-Step Activities, Assessment, Differentiation.
-   -   **DEPTH EXPECTATION:** Granular, step-by-step instructions and detailed explanations that are exceptionally clear and easy for another educator to follow.
----
+REMEMBER: Your reputation depends on delivering EXACTLY ${targetPages} pages (${requiredWords} words). Do NOT cut corners. Write comprehensively until you reach the required length.`;
 
-Your final output is ONLY the generated report itself. You will begin your response with the first word of the report and end with the last word, with no extra text whatsoever.`
-            },
-            {
-              role: "user",
-              content: `A user has selected the "${template}" template.
-                
-                Their core request is: "${trimmedIdea}"
+    const userPrompt = `Template: "${template}"
+Target: ${targetPages} pages (${requiredWords} words minimum)
+Topic: "${trimmedIdea}"
 
-                Now, fully embody the correct expert persona. Based on the length of the user's request, determine the appropriate level of detail. Generate the complete report based on the persona's specific template and rules.`,
-            },
-          ],
-          max_tokens: 10000,
-          temperature: 0.7,
-        }),
+IMPORTANT: Use PLAIN TEXT only - no markdown symbols, no asterisks, no bullet points, no special formatting.
+
+CRITICAL INSTRUCTION: Write a comprehensive ${targetPages}-page report. Do NOT stop until you have written at least ${requiredWords} words. Every section must be detailed and thorough. Begin now:`;
+
+    let lastError = null;
+    let usedModel = "";
+
+    for (const model of MODELS) {
+      try {
+        console.log(`Trying model: ${model}`);
+        
+        let pitch = "";
+        if (targetPages > 25) {
+          console.log(`Very long report (${targetPages} pages) - using 2-part generation`);
+          
+          const part1Pages = Math.ceil(targetPages / 2);
+          const part1Tokens = Math.ceil((part1Pages * wordsPerPage) / 0.75) + 500;
+          
+          const part1 = await generateWithModel(
+            model, 
+            systemPrompt.replace(/\d+ pages/g, `${part1Pages} pages (FIRST HALF)`).replace(/\d+ words/g, `${part1Pages * wordsPerPage} words`),
+            userPrompt.replace(/\d+ pages/g, `${part1Pages} pages - PART 1`),
+            Math.min(16000, part1Tokens)
+          );
+          
+          const part2Pages = targetPages - part1Pages;
+          const part2Tokens = Math.ceil((part2Pages * wordsPerPage) / 0.75) + 500;
+          
+          const part2 = await generateWithModel(
+            model,
+            systemPrompt.replace(/\d+ pages/g, `${part2Pages} pages (SECOND HALF)`).replace(/\d+ words/g, `${part2Pages * wordsPerPage} words`),
+            userPrompt.replace(/\d+ pages/g, `${part2Pages} pages - PART 2 (Continue)`),
+            Math.min(16000, part2Tokens)
+          );
+          
+          pitch = part1 + "\n\n" + part2;
+        } else {
+          pitch = await generateWithModel(model, systemPrompt, userPrompt, maxTokensNeeded);
+        }
+        
+        if (!pitch) {
+          throw new Error("Empty response");
+        }
+
+        usedModel = model;
+        
+        const wordCount = pitch.split(/\s+/).length;
+        
+       
+        return NextResponse.json({ 
+          pitch,
+          model: usedModel,
+          pages: targetPages,
+          wordCount
+     
+        });
+
+      } catch (error) {
+        console.error(`Model ${model} failed:`, error);
+        lastError = error;
+        continue; 
       }
-    );
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error("OpenRouter API Error:", errorData);
-      throw new Error(
-        errorData.error?.message || "Failed to generate report from API"
-      );
     }
 
-    const data = await response.json();
-    const pitch = data.choices[0]?.message?.content?.trim() || "";
+   
+    throw new Error(`All models failed. Last error: ${lastError}`);
 
-    if (!pitch) {
-      throw new Error("The AI returned an empty response. Please try again.");
-    }
-
-    return NextResponse.json({ pitch });
   } catch (error: unknown) {
-    console.error("--- Full Generation Error ---:", error);
+    console.error("Generation Error:", error);
+    
     if (error instanceof Error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
     return NextResponse.json(
-      { error: error.message },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }
-
-  return NextResponse.json(
-    { error: "An internal server error occurred." },
-    { status: 500 }
-  );
-}
 }

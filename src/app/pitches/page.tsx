@@ -6,7 +6,7 @@ export default async function PitchesPage() {
   const session = await getServerSession(authOptions);
 
   if (!session) {
-    redirect("/api/auth/signin"); // redirect if not logged in
+    redirect("/api/auth/signin");
   }
 
   return <div>My Pitches Dashboard</div>;

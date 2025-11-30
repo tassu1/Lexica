@@ -15,7 +15,7 @@ export default function GlobalError({ error, reset }: ErrorProps) {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-amber-50 via-white to-amber-100 text-amber-900 p-6">
       <div className="text-center max-w-lg">
-        {/* Icon */}
+     
         <div className="mb-6">
           <div className="inline-flex items-center justify-center w-20 h-20 bg-amber-100 rounded-full">
             <svg
@@ -35,15 +35,14 @@ export default function GlobalError({ error, reset }: ErrorProps) {
           </div>
         </div>
 
-        {/* Heading */}
+    
 
-        {/* Message */}
         <p className="text-lg mb-8 text-amber-700">
           An unexpected error has occurred. Don&apos;t worry - it&apos;s not
           your fault. Try refreshing the page or returning to safety.
         </p>
 
-        {/* Button */}
+        
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <button
             onClick={() => reset()}
@@ -60,7 +59,6 @@ export default function GlobalError({ error, reset }: ErrorProps) {
           </button>
         </div>
 
-        {/* Support Text */}
         <p className="mt-8 text-sm text-amber-600">
           If the problem persists, please contact our support team.
         </p>

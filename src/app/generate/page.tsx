@@ -7,7 +7,7 @@ import jsPDF from "jspdf";
 import { motion, AnimatePresence } from "framer-motion";
 import Head from "next/head";
 
-// --- Types & Data ---
+
 interface TemplateField {
   id: string;
   label: string;
@@ -171,17 +171,18 @@ export default function GeneratePage() {
     null
   );
   const [idea, setIdea] = useState("");
+  const [pages, setPages] = useState(5); // NEW: page count state
   const [report, setReport] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [error, setError] = useState("");
+  const [usedModel, setUsedModel] = useState(""); // NEW: track which model was used
 
   const { status } = useSession();
   const router = useRouter();
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/api/auth/signin");
-    // Dynamically load the html-to-docx script
     const script = document.createElement("script");
     script.src = "https://unpkg.com/html-to-docx@1.8.0/dist/html-to-docx.js";
     script.async = true;
@@ -193,25 +194,17 @@ export default function GeneratePage() {
 
   const handleEnhancePrompt = async () => {
     if (!idea || !selectedTemplate) return;
-
     setIsEnhancing(true);
-
     setError("");
-
     try {
       const response = await fetch("/api/enhance", {
         method: "POST",
-
         headers: { "Content-Type": "application/json" },
-
         body: JSON.stringify({ idea, template: selectedTemplate }),
       });
-
       const data = await response.json();
-
       if (!response.ok)
         throw new Error(data.error || "Failed to enhance prompt");
-
       setIdea(data.enhancedPrompt);
     } catch (err: unknown) {
       setError((err as Error).message);
@@ -219,22 +212,29 @@ export default function GeneratePage() {
       setIsEnhancing(false);
     }
   };
+
   const handleSubmit = async (e?: FormEvent) => {
     if (e) e.preventDefault();
     if (!idea || !selectedTemplate) return;
     setIsGenerating(true);
     setError("");
     setReport("");
+    setUsedModel("");
     try {
       const response = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idea, template: selectedTemplate.id }),
+        body: JSON.stringify({ 
+          idea, 
+          template: selectedTemplate.id,
+          pages // NEW: send page count
+        }),
       });
       const data = await response.json();
       if (!response.ok)
         throw new Error(data.error || "Failed to generate report");
       setReport(data.pitch || "");
+      setUsedModel(data.model || ""); // NEW: save model info
     } catch (err: unknown) {
       setError((err as Error).message);
     } finally {
@@ -247,73 +247,67 @@ export default function GeneratePage() {
     setIdea("");
     setReport("");
     setError("");
+    setPages(5);
+    setUsedModel("");
   };
 
-  // --- ⬇️ START: CORRECTED & FINAL DOWNLOAD FUNCTIONS ⬇️ ---
-
-const downloadPDF = () => {
-  if (!report) {
-    alert("Report content is not available.");
-    return;
-  }
-
-  const doc = new jsPDF({ unit: "pt", format: "a4" });
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 40;
-  let y = margin;
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(12);
-
-  // Split the full report into wrapped lines
-  const lines = doc.splitTextToSize(report, pageWidth - margin * 2);
-
-  lines.forEach((line:string) => {
-    if (y + 20 > pageHeight - margin) {
-      doc.addPage();
-      y = margin;
+  const downloadPDF = () => {
+    if (!report) {
+      alert("Report content is not available.");
+      return;
     }
-    doc.text(line, margin, y);
-    y += 16; // line height
-  });
-
-  doc.save(`Report-${selectedTemplate?.title.replace(/\s+/g, "-")}.pdf`);
-};
-
-const downloadDocx = async () => {
-  if (!report) return alert("Report content is not available.");
-  try {
-    const res = await fetch("/api/docx", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ report, title: selectedTemplate?.title || "Report" }),
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 40;
+    let y = margin;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(12);
+    const lines = doc.splitTextToSize(report, pageWidth - margin * 2);
+    lines.forEach((line: string) => {
+      if (y + 20 > pageHeight - margin) {
+        doc.addPage();
+        y = margin;
+      }
+      doc.text(line, margin, y);
+      y += 16;
     });
-    if (!res.ok) throw new Error("Failed to generate docx");
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `QuickPitch-${(selectedTemplate?.title || "Report").replace(
-      /\s+/g,
-      "-"
-    )}.docx`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  } catch (err: unknown) {
-    alert((err as Error).message || "Download failed");
-  }
-};
+    doc.save(`Report-${selectedTemplate?.title.replace(/\s+/g, "-")}.pdf`);
+  };
 
+  const downloadDocx = async () => {
+    if (!report) return alert("Report content is not available.");
+    try {
+      const res = await fetch("/api/docx", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          report,
+          title: selectedTemplate?.title || "Report",
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to generate docx");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `QuickPitch-${(selectedTemplate?.title || "Report").replace(
+        /\s+/g,
+        "-"
+      )}.docx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err: unknown) {
+      alert((err as Error).message || "Download failed");
+    }
+  };
 
-  // --- ⬆️ END: CORRECTED & FINAL DOWNLOAD FUNCTIONS ⬆️ ---
   if (status === "loading") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-amber-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-800"></div>
-                   {" "}
       </div>
     );
   }
@@ -376,25 +370,28 @@ const downloadDocx = async () => {
                     <article className="p-6 md:p-10 prose prose-slate max-w-none">
                       <div className="whitespace-pre-line">{report}</div>
                     </article>
-                    <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row gap-4">
-                      <button
-                        onClick={() => handleSubmit()}
-                        className="flex-1 bg-amber-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-amber-600 flex justify-center items-center gap-2"
-                      >
-                        Regenerate
-                      </button>
-                      <button
-                        onClick={downloadPDF}
-                        className="flex-1 border-2 border-slate-300 text-slate-700 px-6 py-3 rounded-lg font-semibold hover:border-amber-400 hover:text-amber-700"
-                      >
-                        Download PDF
-                      </button>
-                      <button
-                        onClick={downloadDocx}
-                        className="flex-1 border-2 border-slate-300 text-slate-700 px-6 py-3 rounded-lg font-semibold hover:border-amber-400 hover:text-amber-700"
-                      >
-                        Download DOCX
-                      </button>
+                    <div className="p-4 bg-slate-50 border-t border-slate-200">
+                      
+                      <div className="flex flex-col sm:flex-row gap-4">
+                        <button
+                          onClick={() => handleSubmit()}
+                          className="flex-1 bg-amber-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-amber-600 flex justify-center items-center gap-2"
+                        >
+                          Regenerate
+                        </button>
+                        <button
+                          onClick={downloadPDF}
+                          className="flex-1 border-2 border-slate-300 text-slate-700 px-6 py-3 rounded-lg font-semibold hover:border-amber-400 hover:text-amber-700"
+                        >
+                          Download PDF
+                        </button>
+                        <button
+                          onClick={downloadDocx}
+                          className="flex-1 border-2 border-slate-300 text-slate-700 px-6 py-3 rounded-lg font-semibold hover:border-amber-400 hover:text-amber-700"
+                        >
+                          Download DOCX
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ) : (
@@ -420,6 +417,27 @@ const downloadDocx = async () => {
                         placeholder={selectedTemplate.placeholder}
                         className="w-full h-40 p-4 text-base text-slate-800 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-400 focus:border-amber-400 resize-none transition-shadow"
                       />
+
+                      {/* NEW: Page Selector */}
+                      <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">
+                          Report Length: {pages} pages
+                        </label>
+                        <input
+                          type="range"
+                          min="2"
+                          max="50"
+                          value={pages}
+                          onChange={(e) => setPages(parseInt(e.target.value))}
+                          className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                        />
+                        <div className="flex justify-between text-xs text-slate-500 mt-1">
+                          <span>Short (2)</span>
+                          <span>Medium (25)</span>
+                          <span>Long (50)</span>
+                        </div>
+                      </div>
+
                       {error && (
                         <div className="p-3 bg-red-50 text-red-700 text-sm font-medium rounded-lg border border-red-200">
                           {error}

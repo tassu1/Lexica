@@ -1,4 +1,4 @@
-// src/app/api/docx/route.ts
+
 import { NextResponse } from "next/server";
 import { Document, Packer, Paragraph, TextRun } from "docx";
 
@@ -6,15 +6,20 @@ export async function POST(req: Request) {
   try {
     const { report = "", title = "report" } = await req.json();
 
-    // Convert report string into paragraphs
     const paragraphs = report.split("\n").map(
       (line: string) =>
         new Paragraph({
-          children: [new TextRun(line)],
+          children: [ 
+            new TextRun({
+          text: line,
+          size: 28,  
+          font: "Helvetica",
+          bold: false,
+        }),
+      ],
         })
     );
 
-    // ✅ Create Document with sections directly
     const doc = new Document({
       sections: [
         {
@@ -23,11 +28,10 @@ export async function POST(req: Request) {
       ],
     });
 
-    // Generate buffer
+
     const buffer = await Packer.toBuffer(doc);
     const uint8Array = new Uint8Array(buffer);
 
-    // Return as DOCX download
     return new NextResponse(uint8Array, {
       status: 200,
       headers: {
