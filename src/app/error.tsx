@@ -35,14 +35,15 @@ export default function GlobalError({ error, reset }: ErrorProps) {
           </div>
         </div>
 
-    
+        {/* Heading */}
 
+        {/* Message */}
         <p className="text-lg mb-8 text-amber-700">
           An unexpected error has occurred. Don&apos;t worry - it&apos;s not
           your fault. Try refreshing the page or returning to safety.
         </p>
 
-        
+        {/* Button */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <button
             onClick={() => reset()}
@@ -59,6 +60,7 @@ export default function GlobalError({ error, reset }: ErrorProps) {
           </button>
         </div>
 
+        {/* Support Text */}
         <p className="mt-8 text-sm text-amber-600">
           If the problem persists, please contact our support team.
         </p>

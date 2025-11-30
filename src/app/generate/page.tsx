@@ -179,6 +179,7 @@ export default function GeneratePage() {
   const [usedModel, setUsedModel] = useState(""); // NEW: track which model was used
 
   const { status } = useSession();
+ 
   const router = useRouter();
 
   useEffect(() => {
@@ -208,7 +209,8 @@ export default function GeneratePage() {
       setIdea(data.enhancedPrompt);
     } catch (err: unknown) {
       setError((err as Error).message);
-    } finally {
+    } 
+    finally {
       setIsEnhancing(false);
     }
   };
